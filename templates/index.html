@@ -1,0 +1,14 @@
+{% extends "layout.html" %}
+{% block body %}
+<h1>Upcoming Pop-ups</h1>
+{% for p in popups %}
+  <div class="card">
+    <h2>{{ p["location"] }}</h2>
+    <p>{{ p["date"] }} &middot; {{ p["time"] }}</p>
+    {% if p["notes"] %}<p class="muted">{{ p["notes"] }}</p>{% endif %}
+    <a class="btn" href="{{ url_for('order_page', popup_id=p['id']) }}">Pre-order</a>
+  </div>
+{% else %}
+  <p>No pop-ups scheduled yet. Check back soon!</p>
+{% endfor %}
+{% endblock %}

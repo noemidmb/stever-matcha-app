@@ -1,0 +1,10 @@
+{% extends "layout.html" %}
+{% block body %}
+<h1>Menu</h1>
+{% for item in items %}
+  <div class="card">
+    <h2>{{ item["name"] }} <span class="price">${{ "%.2f"|format(item["price_cents"] / 100) }}</span></h2>
+    <p class="muted">{{ item["description"] }}</p>
+  </div>
+{% endfor %}
+{% endblock %}

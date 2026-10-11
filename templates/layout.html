@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Stever Matcha</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <nav>
+    <a class="brand" href="{{ url_for('index') }}">🍵 Stever Matcha</a>
+    <a href="{{ url_for('index') }}">Pop-ups</a>
+    <a href="{{ url_for('menu') }}">Menu</a>
+  </nav>
+  <main>
+    {% block body %}{% endblock %}
+  </main>
+</body>
+</html>
