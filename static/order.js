@@ -117,11 +117,7 @@ placeBtn.addEventListener("click", async () => {
       });
       const data = await res.json();
       if (res.ok) {
-        asideEl.replaceChildren(
-          el("h2", null, "Order placed! 🍵"),
-          el("p", null, "Thanks, " + nameInput.value.trim() + "! Pay at the pop-up when you pick up."),
-          el("p", "muted", "Your order code: " + data.code)
-        );
+        window.location.href = "/status/" + data.code;
         return;
       }
       errorEl.textContent = data.error || "Something went wrong.";

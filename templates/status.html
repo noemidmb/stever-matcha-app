@@ -1,0 +1,29 @@
+{% extends "layout.html" %}
+{% block body %}
+<div id="status-root" data-code="{{ order['code'] }}" data-status="{{ order['status'] }}">
+  <h1>Thanks, {{ order["customer_name"] }}!</h1>
+  <p class="muted">{{ order["popup_location"] }} &middot; keep this page open, it updates by itself</p>
+
+  <div class="card status-card">
+    <p id="status-label" class="status-label">{{ order["label"] }}</p>
+    <div class="steps">
+      <div class="step">Received</div>
+      <div class="step">Whisking</div>
+      <div class="step">Ready</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Your order</h2>
+    {% for i in order["items"] %}
+    <p>
+      {{ i["quantity"] }} &times; <strong>{{ i["item_name"] }}</strong>
+      <span class="price">${{ "%.2f"|format(i["unit_price_cents"] * i["quantity"] / 100) }}</span><br>
+      <span class="muted">{{ i["temp"] }} &middot; {{ i["milk"] }} &middot; {{ i["sweetness"] }}</span>
+    </p>
+    {% endfor %}
+    <p class="cart-total">Total <strong>${{ "%.2f"|format(order["total_cents"] / 100) }}</strong></p>
+  </div>
+</div>
+<script src="{{ url_for('static', filename='status.js') }}"></script>
+{% endblock %}

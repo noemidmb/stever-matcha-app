@@ -1,0 +1,9 @@
+{% extends "layout.html" %}
+{% block body %}
+<h1>Admin login</h1>
+<form method="post" class="card">
+  <input type="password" name="password" placeholder="Password" autofocus>
+  <button class="btn" type="submit">Log in</button>
+  {% if error %}<p class="error">{{ error }}</p>{% endif %}
+</form>
+{% endblock %}

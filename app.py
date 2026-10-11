@@ -4,9 +4,13 @@ import smtplib
 import sqlite3
 import threading
 from email.message import EmailMessage
+from functools import wraps
 
-from flask import Flask, render_template, g, abort, request, jsonify
+from flask import (Flask, render_template, g, abort, request, jsonify,
+                   session, redirect, url_for)
 app = Flask(__name__)
+app.secret_key = os.environ.get("SECRET_KEY", "dev-only-change-me")
+ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "matcha")
 DATABASE = "stever.db"
 
 # Customization choices -> extra price in cents
@@ -16,6 +20,12 @@ OPTIONS = {
     "temp": {"Iced": 0, "Hot": 0},
 }
 
+STATUS_LABELS = {
+    "pending": "Order received",
+    "whisking": "Being whisked",
+    "ready": "Ready for pickup!",
+    "picked_up": "Picked up",
+}
 
 def get_db():
     """Open one database connection per request."""
@@ -111,6 +121,26 @@ def send_email(subject, body):
     except Exception as e:
         print("Email failed:", e)
 
+# Fetch an order together with its pop-up's location
+ORDER_SELECT = """SELECT o.*, p.location FROM orders o
+                  JOIN popups p ON p.id = o.popup_id"""
+
+
+def order_to_dict(db, row):
+    """Turn an order row into a plain dict, with its items and total."""
+    items = [dict(i) for i in db.execute(
+        """SELECT item_name, milk, sweetness, temp, unit_price_cents, quantity
+           FROM order_items WHERE order_id = ?""", (row["id"],)).fetchall()]
+    return {
+        "id": row["id"],
+        "code": row["code"],
+        "customer_name": row["customer_name"],
+        "status": row["status"],
+        "label": STATUS_LABELS[row["status"]],
+        "popup_location": row["location"],
+        "items": items,
+        "total_cents": sum(i["unit_price_cents"] * i["quantity"] for i in items),
+    }
 
 @app.route("/")
 def index():
@@ -196,7 +226,79 @@ def create_order():
                      daemon=True).start()
 
     return jsonify(code=code), 201
-    
+
+@app.route("/status/<code>")
+def status_page(code):
+    db = get_db()
+    row = db.execute(ORDER_SELECT + " WHERE o.code = ?", (code,)).fetchone()
+    if row is None:
+        abort(404)
+    return render_template("status.html", order=order_to_dict(db, row))
+
+@app.route("/api/orders/<code>")
+def order_status(code):
+    row = get_db().execute(
+        "SELECT status FROM orders WHERE code = ?", (code,)).fetchone()
+    if row is None:
+        return jsonify(error="not found"), 404
+    return jsonify(status=row["status"], label=STATUS_LABELS[row["status"]])
+def admin_required(view):
+    """Wrap a route so only logged-in admins can use it."""
+    @wraps(view)
+    def wrapped(*args, **kwargs):
+        if not session.get("is_admin"):
+            if request.path.startswith("/admin/api/"):
+                return jsonify(error="unauthorized"), 401
+            return redirect(url_for("admin_login"))
+        return view(*args, **kwargs)
+    return wrapped
+
+
+@app.route("/admin/login", methods=["GET", "POST"])
+def admin_login():
+    error = None
+    if request.method == "POST":
+        if secrets.compare_digest(request.form.get("password", ""), ADMIN_PASSWORD):
+            session["is_admin"] = True
+            return redirect(url_for("admin_queue"))
+        error = "Wrong password."
+    return render_template("admin_login.html", error=error)
+
+
+@app.route("/admin/logout")
+def admin_logout():
+    session.clear()
+    return redirect(url_for("index"))
+
+
+@app.route("/admin")
+@admin_required
+def admin_queue():
+    return render_template("admin.html")
+
+
+@app.route("/admin/api/orders")
+@admin_required
+def admin_orders():
+    db = get_db()
+    rows = db.execute(
+        ORDER_SELECT + " WHERE o.status != 'picked_up' ORDER BY o.created_at, o.id"
+    ).fetchall()
+    return jsonify(orders=[order_to_dict(db, r) for r in rows])
+
+@app.route("/admin/api/orders/<int:order_id>/status", methods=["POST"])
+@admin_required
+def admin_set_status(order_id):
+    status = (request.get_json(silent=True) or {}).get("status")
+    if status not in STATUS_LABELS:
+        return jsonify(error="bad status"), 400
+    db = get_db()
+    cur = db.execute("UPDATE orders SET status = ? WHERE id = ?", (status, order_id))
+    db.commit()
+    if cur.rowcount == 0:
+        return jsonify(error="not found"), 404
+    return jsonify(ok=True)
+
 if __name__ == "__main__":
     init_db()
     app.run(port=5001, debug=True)
